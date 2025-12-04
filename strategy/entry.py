@@ -60,7 +60,9 @@ def anti_chase(
     close: pd.Series,
     prev_range: pd.Series,
     pct: float = 0.3,
-    side: str = 'long'
+    side: str = 'long',
+    low: pd.Series = None,
+    high: pd.Series = None
 ) -> pd.Series:
     """
     Anti-chase filter to prevent entering after extended moves.
@@ -70,14 +72,20 @@ def anti_chase(
         prev_range: Previous bar's high-low range
         pct: Percentage of range to use as threshold (default 0.3)
         side: Entry direction ('long' or 'short')
+        low: Series of low prices (required for long side)
+        high: Series of high prices (required for short side)
     
     Returns:
         Boolean series indicating where entry is allowed
     """
     if side == 'long':
-        return close <= (close.shift(1) - close.shift(1).pct_change() * pct)
+        if low is None:
+            raise ValueError("low series required for long side anti-chase")
+        return close <= low.shift(1) + pct * prev_range
     else:
-        return close >= (close.shift(1) + close.shift(1).pct_change() * pct)
+        if high is None:
+            raise ValueError("high series required for short side anti-chase")
+        return close >= high.shift(1) - pct * prev_range
 
 
 def build_signal(
@@ -126,8 +134,8 @@ def build_signal(
     regime_short = (df.regime == "high_vol_down")
     
     # Apply anti-chase filters
-    chase_long = anti_chase(df.close, prev_range, range_pct, 'long')
-    chase_short = anti_chase(df.close, prev_range, range_pct, 'short')
+    chase_long = anti_chase(df.close, prev_range, range_pct, 'long', low=df.low)
+    chase_short = anti_chase(df.close, prev_range, range_pct, 'short', high=df.high)
     
     # Combine all conditions
     long_signal = core_long_signal & regime_long & chase_long
