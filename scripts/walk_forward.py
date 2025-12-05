@@ -187,3 +187,21 @@ Parameter Grid:
 """
         
         return report
+
+
+if __name__ == "__main__":
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from scripts.backtest_runner import load_data
+    
+    logger = structlog.get_logger()
+    logger.info("Loading data for walk-forward optimization")
+    # Use available data (since we don't have full 2020-2024)
+    df = load_data()
+    
+    optimizer = WalkForwardOptimizer()
+    results = optimizer.optimize(df)
+    
+    report = optimizer.generate_report(results)
+    print(report)

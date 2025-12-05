@@ -15,6 +15,7 @@ from binance.client import Client
 import pyarrow as pa
 import pyarrow.parquet as pq
 import structlog
+import pyarrow.dataset as ds
 
 logger = structlog.get_logger()
 
@@ -45,9 +46,11 @@ def process_klines(df):
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
     
     # Convert string values to float
-    for col in ['open', 'high', 'low', 'close', 'volume', 'quote_asset_volume']:
+    for col in ['open', 'high', 'low', 'close', 'volume', 'quote_asset_volume', 'taker_buy_base']:
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+        # Force conversion to float64 in case column remains object
         df[col] = df[col].astype(float)
-    
+
     # Calculate bid/ask size from taker data
     df['bid_size'] = df['volume'] * (1 - df['taker_buy_base'] / df['volume'])
     df['ask_size'] = df['volume'] - df['bid_size']
@@ -80,7 +83,7 @@ def download_year(client, symbol, year, output_dir):
         ('vwap', pa.float64())
     ])
     
-    partitioning = pa.dataset.partitioning(
+    partitioning = ds.partitioning(
         pa.schema([("month", pa.int32())]),
         flavor="hive"
     )
@@ -116,8 +119,7 @@ def download_year(client, symbol, year, output_dir):
         output_file = output_dir / f"btcusdt_{year}.parquet"
         pq.write_to_dataset(
             table,
-            root_path=str(output_file),
-            partition_cols=['month'],
+            root_path=str(output_dir),
             partitioning=partitioning,
             compression='snappy',
             existing_data_behavior='delete_matching'
