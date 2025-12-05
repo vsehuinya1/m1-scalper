@@ -100,7 +100,7 @@ def main():
     equity = results['equity']
     print("Equity curve (first 10 values):")
     for i in range(min(10, len(equity))):
-        print(f"{i}: {equity[i]:.2f}")
+        print(f"{i}: {equity.iloc[i]:.2f}")
     
     # Print summary
     print(f"\nTotal trades: {results['num_trades']}")

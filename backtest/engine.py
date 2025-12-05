@@ -202,25 +202,33 @@ def simulate(
     return pd.Series(equity, index=close.index)
 
 
-# Python wrapper functions that accept pandas Series
+# Python wrapper functions that accept pandas Series or numpy arrays
 def calculate_sharpe_ratio(
-    returns: pd.Series,
+    returns,
     risk_free_rate: float = 0.0,
     annualization: float = 252 * 24 * 60
 ) -> float:
     """Calculate Sharpe ratio for returns series (pandas wrapper)."""
+    if isinstance(returns, pd.Series):
+        values = returns.values
+    else:
+        values = returns
     return calculate_sharpe_ratio_numba(
-        returns.values,
+        values,
         risk_free_rate,
         annualization
     )
 
 
 def calculate_max_drawdown(
-    equity_curve: pd.Series
+    equity_curve
 ) -> float:
     """Calculate maximum drawdown from equity curve (pandas wrapper)."""
-    return calculate_max_drawdown_numba(equity_curve.values)
+    if isinstance(equity_curve, pd.Series):
+        values = equity_curve.values
+    else:
+        values = equity_curve
+    return calculate_max_drawdown_numba(values)
 
 
 # Export functions for direct use
