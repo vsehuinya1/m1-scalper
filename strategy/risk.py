@@ -14,19 +14,23 @@ def position_size(
     equity: float,
     entry: float,
     stop: float,
+    close: float,
     risk_pct: float = 0.002,
     min_size: float = 0.001,
+    max_notional_mult: float = 10.0,
     round_decimals: int = 3
 ) -> float:
     """
-    Calculate position size based on fixed percentage risk.
+    Calculate position size based on fixed percentage risk with notional cap.
     
     Args:
         equity: Current account equity
         entry: Entry price
         stop: Stop loss price
+        close: Current close price (for notional cap)
         risk_pct: Risk per trade as decimal (default 0.2%)
         min_size: Minimum position size in BTC (default 0.001)
+        max_notional_mult: Maximum notional as multiple of equity
         round_decimals: Round size to this many decimals
     
     Returns:
@@ -34,6 +38,9 @@ def position_size(
     """
     risk_usd = equity * risk_pct
     size = risk_usd / abs(entry - stop)
+    # Apply notional cap: qty * close <= max_notional_mult * equity
+    notional_limit = max_notional_mult * equity / close
+    size = min(size, notional_limit)
     size = max(round(size, round_decimals), min_size)
     return size
 

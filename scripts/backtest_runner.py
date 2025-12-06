@@ -21,7 +21,7 @@ from backtest.engine import BacktestEngine
 logger = structlog.get_logger()
 
 def load_data(start_date=None, end_date=None) -> pd.DataFrame:
-    """Load all downloaded data from parquet files, optionally filter by date range, and exclude 00-04 UTC."""
+    """Load all downloaded data from parquet files, optionally filter by date range."""
     data_dir = Path("data/binance_1m")
     if not data_dir.exists():
         raise FileNotFoundError(f"Data directory {data_dir} not found. Run 'make download' first.")
@@ -47,11 +47,8 @@ def load_data(start_date=None, end_date=None) -> pd.DataFrame:
     if end_date:
         df = df[df['timestamp'] <= end_date]
     
-    # Exclude 00-04 UTC hours
-    df = df[~df['timestamp'].dt.hour.isin([0, 1, 2, 3])]
-    
     logger.info("Loaded data", rows=len(df), columns=df.columns.tolist())
-    logger.info(f"Date range: {start_date} to {end_date}, excluded 00-04 UTC")
+    logger.info(f"Date range: {start_date} to {end_date}")
     return df
 
 def main():

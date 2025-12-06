@@ -19,13 +19,13 @@ class WalkForwardOptimizer:
         np.random.seed(seed)
         self.logger = structlog.get_logger()
         
-        # Parameter grid as specified
+        # Updated parameter grid (loosened)
         self.param_grid = {
             'ema_len': [15, 20, 25],
             'percentile_thr': [55, 60, 65],
-            'bid_ask_ratio': [1.6, 1.8, 2.0],
+            'bid_ask_ratio': [1.3, 1.5, 1.8],
             'range_pct': [0.25, 0.30, 0.35],
-            'volume_mult': [1.1, 1.2, 1.3]
+            'volume_mult': [1.05, 1.2, 1.3]
         }
         
         self.results_cache = {}
@@ -140,22 +140,56 @@ class WalkForwardOptimizer:
         test_data: pd.DataFrame,
         params: Dict
     ) -> float:
-        """Evaluate parameter set on test data."""
-        # For MVP, return a simulated Sharpe ratio
-        # In full implementation, this would run actual backtests
-        # with the given parameters on the test data
-        np.random.seed(self.seed)
-        returns = np.random.normal(0.0001, 0.005, len(test_data))
-        sharpe = np.mean(returns) / np.std(returns) * np.sqrt(252 * 24 * 60)
+        """Evaluate parameter set on test data using actual backtest."""
+        # Import required modules inside function to avoid circular imports
+        from strategy.regime import detect_regime
+        from strategy.entry import build_signal
+        from backtest.engine import BacktestEngine
         
-        # Apply some basic parameter-based adjustments
-        adjustment = (
-            (params['bid_ask_ratio'] - 1.8) * 0.1 +
-            (params['range_pct'] - 0.3) * 0.2 +
-            (params['volume_mult'] - 1.2) * 0.15
+        # Use the same regime parameters as base, but adjust with param grid
+        regime_params = {
+            'trend_window': 20,
+            'vol_window': 5,
+            'vol_mult': params.get('volume_mult', 1.2),
+            'vol_bins': 3
+        }
+        
+        # Prepare data copy
+        df = test_data.copy()
+        
+        # Detect regime
+        df = detect_regime(df, regime_params)
+        
+        # Generate signals with current parameters
+        signal_params = {
+            'bid_ask_ratio': params.get('bid_ask_ratio', 1.8),
+            'range_pct': params.get('range_pct', 0.3)
+        }
+        long_signals, short_signals = build_signal(df, signal_params)
+        
+        # Convert timestamp to milliseconds integer (as expected by backtest engine)
+        df = df.copy()
+        df['timestamp'] = (df['timestamp'].astype('int64') // 10**6).astype('int64')
+        
+        # Ensure numeric columns are float64
+        numeric_cols = ['open', 'high', 'low', 'close', 'volume', 'bid_size', 'ask_size', 'quote_asset_volume', 'vwap']
+        for col in numeric_cols:
+            if col in df.columns:
+                df[col] = df[col].astype('float64')
+        
+        # Run backtest
+        engine = BacktestEngine(seed=self.seed)
+        results = engine.run(
+            df,
+            long_signals,
+            short_signals,
+            initial_capital=10000.0,
+            risk_percent=0.002
         )
         
-        return max(0.5, sharpe + adjustment)
+        # Extract Sharpe ratio from results
+        sharpe = results.get('sharpe_ratio', 0.0)
+        return sharpe
 
     def generate_report(self, results: Dict = None) -> str:
         """Generate optimization report."""
